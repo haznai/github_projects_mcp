@@ -246,3 +246,79 @@ class GitHubProjectsClient:
                 filtered_commits.append(commit)
 
         return filtered_commits
+
+    def get_all_user_data(self, username: str) -> Dict[str, Any]:
+        """Get all data for a user: projects, items, and comments"""
+        projects = self.get_user_projects(username)
+
+        result = {
+            "username": username,
+            "projects": []
+        }
+
+        for project in projects:
+            if project.get("closed"):
+                continue
+
+            project_data = self.get_project_items(project["id"])
+            project_with_items = {
+                **project,
+                **project_data
+            }
+
+            # Get comments for each issue
+            items = project_data.get("items", {}).get("nodes", [])
+            for item in items:
+                content = item.get("content", {})
+                if content and content.get("number") and content.get("url"):
+                    url = content["url"]
+                    if "/issues/" in url or "/pull/" in url:
+                        parts = url.split("/")
+                        owner, repo = parts[3], parts[4]
+                        try:
+                            comments = self.get_issue_comments(owner, repo, content["number"])
+                            item["comments"] = comments
+                        except Exception:
+                            item["comments"] = []
+
+            result["projects"].append(project_with_items)
+
+        return result
+
+    def get_all_org_data(self, org: str) -> Dict[str, Any]:
+        """Get all data for an organization: projects, items, and comments"""
+        projects = self.get_org_projects(org)
+
+        result = {
+            "organization": org,
+            "projects": []
+        }
+
+        for project in projects:
+            if project.get("closed"):
+                continue
+
+            project_data = self.get_project_items(project["id"])
+            project_with_items = {
+                **project,
+                **project_data
+            }
+
+            # Get comments for each issue
+            items = project_data.get("items", {}).get("nodes", [])
+            for item in items:
+                content = item.get("content", {})
+                if content and content.get("number") and content.get("url"):
+                    url = content["url"]
+                    if "/issues/" in url or "/pull/" in url:
+                        parts = url.split("/")
+                        owner, repo = parts[3], parts[4]
+                        try:
+                            comments = self.get_issue_comments(owner, repo, content["number"])
+                            item["comments"] = comments
+                        except Exception:
+                            item["comments"] = []
+
+            result["projects"].append(project_with_items)
+
+        return result
