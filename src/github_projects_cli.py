@@ -393,35 +393,34 @@ class GitHubProjectsCLI:
 
             # Display issue details
             console.print(f"\n[bold cyan]Issue #{number}: {content.get('title', 'Untitled')}[/bold cyan]")
-            console.print(f"[dim]Author: @{content.get('author', {}).get('login', 'Unknown')}[/dim]")
-            console.print(f"[dim]State: {content.get('state', 'Unknown')}[/dim]")
-            console.print(f"[dim]URL: {url}[/dim]\n")
+            console.print(f"[dim]State: {content.get('state', 'Unknown')} | URL: {url}[/dim]\n")
 
+            # Display issue description as first comment
             if content.get("body"):
+                author = content.get("author", {}).get("login", "Unknown")
+                created = content.get("createdAt", "Unknown")[:10]
                 console.print(Panel(
                     Markdown(content.get("body")),
-                    title="Description",
-                    border_style="yellow"
+                    title=f"@{author} - {created}",
+                    border_style="green"
                 ))
 
             # Get and display comments
             try:
                 comments = self.client.get_issue_comments(owner, repo, number)
 
-                if comments:
-                    console.print(f"\n[bold]Comments ({len(comments)})[/bold]\n")
+                for comment in comments:
+                    author = comment.get("author", {}).get("login", "Unknown")
+                    created = comment.get("createdAt", "Unknown")[:10]
+                    body = comment.get("body", "No content")
 
-                    for comment in comments:
-                        author = comment.get("author", {}).get("login", "Unknown")
-                        created = comment.get("createdAt", "Unknown")[:10]
-                        body = comment.get("body", "No content")
+                    console.print(Panel(
+                        Markdown(body),
+                        title=f"@{author} - {created}",
+                        border_style="green"
+                    ))
 
-                        console.print(Panel(
-                            Markdown(body),
-                            title=f"@{author} - {created}",
-                            border_style="green"
-                        ))
-                else:
+                if not comments and not content.get("body"):
                     console.print("[dim]No comments on this issue[/dim]")
 
             except Exception as e:
