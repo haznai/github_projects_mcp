@@ -2,6 +2,8 @@
 ------
 Create a MCP Server for the "GitHub Projects" Kanban board. I don't want to be able to do fancy stuff, I just want to be able to read and write all the issues (their comments and subcomments) of all my Github Project boards linked to my GitHub account.
 
+You can think of the goal as like: I need all informations I can to reconstruct a read-only barebones version of the GitHub Project UI, where moving etc. of issues doesn't work, but all the relevant info can be fetched, ad-hoc.
+
 ## Tech Stack
 - Python 3.13
 - `uv` (managed through `pyproject.toml`)
