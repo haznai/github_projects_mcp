@@ -232,6 +232,42 @@ class GitHubProjectsClient:
         result = self.execute_query(query)
         issue = result.get("data", {}).get("repository", {}).get("issue", {})
         return issue.get("comments", {}).get("nodes", [])
+    
+    def get_commits_by_prefix(self, owner: str, repo: str, prefix: str) -> List[Dict[str, Any]]:
+        """Get commits with messages starting with given prefix"""
+        query = f"""
+        query {{
+            repository(owner: "{owner}", name: "{repo}") {{
+                defaultBranchRef {{
+                    target {{
+                        ... on Commit {{
+                            history(first: 100) {{
+                                nodes {{
+                                    oid
+                                    message
+                                    author {{
+                                        name
+                                        date
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }}
+        """
+        result = self.execute_query(query)
+        commits = result.get("data", {}).get("repository", {}).get("defaultBranchRef", {}).get("target", {}).get("history", {}).get("nodes", [])
+        
+        # Filter commits by prefix
+        filtered_commits = []
+        for commit in commits:
+            message = commit.get("message", "")
+            if message.startswith(prefix):
+                filtered_commits.append(commit)
+        
+        return filtered_commits
 
 
 class GitHubProjectsCLI:
@@ -425,6 +461,33 @@ class GitHubProjectsCLI:
 
             except Exception as e:
                 console.print(f"[red]Error fetching comments: {e}[/red]")
+    
+    def display_commits(self, owner: str, repo: str):
+        """Display commits filtered by prefix"""
+        prefix = Prompt.ask("\nWhich commit prefix should be displayed? (e.g., 'gpmcp-2:')", default="")
+        
+        if not prefix:
+            return
+            
+        try:
+            commits = self.client.get_commits_by_prefix(owner, repo, prefix)
+            
+            if not commits:
+                console.print(f"[yellow]No commits found with prefix '{prefix}'[/yellow]")
+                return
+            
+            console.print(f"\n[bold cyan]Commits with prefix '{prefix}' ({len(commits)})[/bold cyan]\n")
+            
+            for commit in commits:
+                hash_short = commit.get("oid", "")[:7]
+                message = commit.get("message", "").split('\n')[0]  # First line only
+                author = commit.get("author", {}).get("name", "Unknown")
+                date = commit.get("author", {}).get("date", "")[:10]
+                
+                console.print(f"[yellow]{hash_short}[/yellow] {message} [dim]by {author} on {date}[/dim]")
+                
+        except Exception as e:
+            console.print(f"[red]Error fetching commits: {e}[/red]")
 
     def run(self):
         """Main CLI loop"""
@@ -496,6 +559,29 @@ class GitHubProjectsCLI:
                 # Ask which issue to see comments for
                 if items:
                     self.display_issue_details(items)
+                    
+                    # Ask if user wants to see commits
+                    show_commits = Prompt.ask(
+                        "\nWould you like to see commits for this project?",
+                        choices=["yes", "no"],
+                        default="no"
+                    )
+                    
+                    if show_commits == "yes":
+                        # Extract owner and repo from project URL or first issue
+                        owner, repo = None, None
+                        for item in items:
+                            content = item.get("content", {})
+                            url = content.get("url", "")
+                            if "/issues/" in url or "/pull/" in url:
+                                parts = url.split("/")
+                                owner, repo = parts[3], parts[4]
+                                break
+                        
+                        if owner and repo:
+                            self.display_commits(owner, repo)
+                        else:
+                            console.print("[red]Could not determine repository from project items[/red]")
 
             except Exception as e:
                 console.print(f"[red]Error loading project: {e}[/red]")
