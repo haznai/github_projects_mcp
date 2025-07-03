@@ -438,27 +438,36 @@ class GitHubProjectsCLI:
         console.print("[bold cyan]GitHub Projects Explorer[/bold cyan]\n")
 
         while True:
-            # Use cached choice or ask
-            default_choice = self.cache.get("last_choice", "user")
-            choice = Prompt.ask(
-                "What would you like to explore?",
-                choices=["user", "org", "exit"],
-                default=default_choice
-            )
+            # Skip prompts if cache has both choice and username/org
+            if self.cache.get("last_choice") and (self.cache.get("last_username") or self.cache.get("last_org")):
+                choice = self.cache["last_choice"]
+                console.print(f"[dim]Using cached: {choice}[/dim]")
+            else:
+                # Use cached choice or ask
+                default_choice = self.cache.get("last_choice", "user")
+                choice = Prompt.ask(
+                    "What would you like to explore?",
+                    choices=["user", "org", "exit"],
+                    default=default_choice
+                )
 
-            if choice == "exit":
-                console.print("[yellow]Goodbye![/yellow]")
-                break
+                if choice == "exit":
+                    console.print("[yellow]Goodbye![/yellow]")
+                    break
 
-            # Save choice
-            self.cache["last_choice"] = choice
+                # Save choice
+                self.cache["last_choice"] = choice
 
             if choice == "user":
-                # Use cached username or ask
-                default_username = self.cache.get("last_username", "octocat")
-                username = Prompt.ask("Enter GitHub username", default=default_username)
-                self.cache["last_username"] = username
-                self.save_cache()
+                if self.cache.get("last_username"):
+                    username = self.cache["last_username"]
+                    console.print(f"[dim]Using cached username: {username}[/dim]")
+                else:
+                    # Use cached username or ask
+                    default_username = self.cache.get("last_username", "octocat")
+                    username = Prompt.ask("Enter GitHub username", default=default_username)
+                    self.cache["last_username"] = username
+                    self.save_cache()
 
                 try:
                     projects = self.client.get_user_projects(username)
@@ -466,11 +475,15 @@ class GitHubProjectsCLI:
                     console.print(f"[red]Error: {e}[/red]")
                     continue
             else:  # org
-                # Use cached org or ask
-                default_org = self.cache.get("last_org", "github")
-                org = Prompt.ask("Enter GitHub organization", default=default_org)
-                self.cache["last_org"] = org
-                self.save_cache()
+                if self.cache.get("last_org"):
+                    org = self.cache["last_org"]
+                    console.print(f"[dim]Using cached org: {org}[/dim]")
+                else:
+                    # Use cached org or ask
+                    default_org = self.cache.get("last_org", "github")
+                    org = Prompt.ask("Enter GitHub organization", default=default_org)
+                    self.cache["last_org"] = org
+                    self.save_cache()
 
                 try:
                     projects = self.client.get_org_projects(org)
