@@ -17,7 +17,9 @@ Classes:
 Features:
     - Lists all projects for a user/organization
     - Shows project items in kanban-style boards (grouped by status)
-    - Displays issue details and all comments
+    - Select issues by their actual GitHub number (e.g., enter "2" for issue #2)
+    - Displays issue details with description and comments combined
+    - Filter and display commits by message prefix (e.g., "gpmcp-2:")
     - Caches last used username/org for convenience
 """
 import os
