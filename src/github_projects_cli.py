@@ -315,33 +315,38 @@ class GitHubProjectsCLI:
                 status_groups[status] = []
             status_groups[status].append(item)
 
-        # Display kanban board
-        for status, status_items in status_groups.items():
-            panel_content = []
+        # Define status order: TODO first, CLOSED last, everything else in between
+        status_order = []
+        todo_statuses = [s for s in status_groups.keys() if "todo" in s.lower()]
+        closed_statuses = [s for s in status_groups.keys() if "closed" in s.lower() or "done" in s.lower()]
+        other_statuses = [s for s in status_groups.keys() if s not in todo_statuses + closed_statuses]
+        
+        status_order.extend(todo_statuses)
+        status_order.extend(sorted(other_statuses))
+        status_order.extend(closed_statuses)
 
-            for idx, item in enumerate(status_items, 1):
+        # Display kanban board in order
+        for status in status_order:
+            status_items = status_groups[status]
+            
+            table = Table(title=f"{status} ({len(status_items)})", show_header=False, box=None)
+            table.add_column("Issues", justify="center")
+
+            for item in status_items:
                 content = item.get("content") or {}
                 if not content:
                     continue
 
                 title = content.get("title", "Untitled")
-                number = content.get("number", "")
-                assignees = [a["login"] for a in content.get("assignees", {}).get("nodes", []) if a.get("login")]
-
-                item_line = f"{idx}. {title}"
+                number = content.get('number', '')
+                
                 if number:
-                    item_line += f" #{number}"
-                if assignees:
-                    item_line += f" [dim](@{', @'.join(assignees)})[/dim]"
+                    table.add_row(f"{title} #{number}")
+                else:
+                    table.add_row(title)
 
-                panel_content.append(item_line)
-
-            panel = Panel(
-                "\n".join(panel_content) if panel_content else "[dim]No items[/dim]",
-                title=f"{status} ({len(status_items)})",
-                border_style="cyan"
-            )
-            console.print(panel)
+            console.print(table, justify="center")
+            console.print()
 
         return items
 
@@ -355,38 +360,27 @@ class GitHubProjectsCLI:
                 numbered_items.append(item)
 
         if not numbered_items:
-            console.print("[red]No issues found with comments![/red]")
+            console.print("[red]No issues found![/red]")
             return
 
-        table = Table(title="Select an Issue", show_header=True, header_style="bold magenta")
-        table.add_column("#", style="dim", width=6)
-        table.add_column("Title", style="cyan")
-        table.add_column("Number", style="yellow")
-        table.add_column("State", style="green")
-        table.add_column("Author", style="blue")
-
-        for idx, item in enumerate(numbered_items, 1):
-            content = item.get("content", {})
-            table.add_row(
-                str(idx),
-                content.get("title", "Untitled"),
-                f"#{content.get('number', '')}",
-                content.get("state", "Unknown"),
-                content.get("author", {}).get("login", "Unknown")
-            )
-
-        console.print("\n")
-        console.print(table)
-
         choice = IntPrompt.ask(
-            "\nWhich issue would you like to see comments for? (Enter number or 0 to go back)",
+            "\nWhich issue number would you like to see? (Enter issue number or 0 to go back)",
             default=0
         )
 
-        if choice == 0 or choice > len(numbered_items):
+        if choice == 0:
             return
 
-        selected_item = numbered_items[choice - 1]
+        # Find item by issue number
+        selected_item = None
+        for item in numbered_items:
+            if item.get("content", {}).get("number") == choice:
+                selected_item = item
+                break
+
+        if not selected_item:
+            console.print(f"[red]Issue #{choice} not found![/red]")
+            return
         content = selected_item.get("content", {})
 
         # Extract owner and repo from URL
