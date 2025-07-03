@@ -1,6 +1,8 @@
 # project-specific
 .github_projects_cache.json
 run_github_project_cli.sh
+run_tests.sh
+serve_local_mcp_server.sh
 
 # Python
 __pycache__/
@@ -17,4 +19,3 @@ venv/
 # IDEs
 .vscode/
 .idea/
-

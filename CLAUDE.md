@@ -4,7 +4,21 @@ Create a MCP Server for the "GitHub Projects" Kanban board. I don't want to be a
 
 You can think of the goal as like: I need all informations I can to reconstruct a read-only barebones version of the GitHub Project UI, where moving etc. of issues doesn't work, but all the relevant info can be fetched, ad-hoc.
 
-## Existing Components
+## Current Components
+- `src/github_client.py` - Refactored GitHub GraphQL client with flexible project finding
+- `src/github_projects_mcp.py` - FastMCP server with 5 core resources
+- `src/mcp_test.py` - Basic tests (need completion for org projects)
+- `src/github_projects_cli.py` - Original CLI (now uses refactored client)
+- `serve_local_mcp_server.sh` - Server startup script
+
+## API Resources
+- `github://user/{username}` - List projects for user
+- `github://org/{org}` - List projects for org  
+- `github://project/{username}/{project}` - Show issues by name/ID/number
+- `github://org-project/{org}/{project}` - Show org project issues
+- `github://issue/{owner}/{repo}/{number}` - Show issue details + comments
+
+## Original Components
 - `github_projects_cli.py` - Standalone CLI for testing GitHub GraphQL queries
   - Fetches Projects → Issues → Comments hierarchy
   - Uses direct GraphQL queries with httpx (no GitHub API libraries)
