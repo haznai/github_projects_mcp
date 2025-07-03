@@ -2,7 +2,7 @@
 GitHub Projects Client
 
 A client for interacting with GitHub Projects using GraphQL API.
-Extracted from github_projects_cli.py to be reusable in MCP server.
+Focused on navigation hierarchy: User → Project → Issue
 """
 import os
 import httpx
@@ -14,7 +14,7 @@ class GitHubProjectsClient:
         self.token = token or os.getenv("GITHUB_TOKEN")
         if not self.token:
             raise ValueError("GitHub token is required. Set GITHUB_TOKEN environment variable or pass token parameter.")
-
+        
         self.base_url = "https://api.github.com/graphql"
         self.headers = {
             "Authorization": f"Bearer {self.token}",
@@ -52,7 +52,42 @@ class GitHubProjectsClient:
         }}
         """
         result = self.execute_query(query)
-        return result.get("data", {}).get("user", {}).get("projectsV2", {}).get("nodes", [])
+        projects = result.get("data", {}).get("user", {}).get("projectsV2", {}).get("nodes", [])
+        return [p for p in projects if not p.get("closed", False)]
+
+    def _find_project_in_list(self, projects: List[Dict[str, Any]], identifier: str) -> str:
+        """Find project ID in a list by name, number, or ID"""
+        # Exact ID match
+        for p in projects:
+            if p.get("id") == identifier:
+                return identifier
+        
+        # Number match (#10 or 10)
+        number = identifier.lstrip("#")
+        if number.isdigit():
+            for p in projects:
+                if str(p.get("number")) == number:
+                    return p.get("id")
+        
+        # Exact title match (case insensitive)
+        for p in projects:
+            if p.get("title", "").lower() == identifier.lower():
+                return p.get("id")
+        
+        # Partial title match
+        for p in projects:
+            if identifier.lower() in p.get("title", "").lower():
+                return p.get("id")
+        
+        raise ValueError(f"Project not found: {identifier}")
+
+    def find_project_id(self, username: str, identifier: str) -> str:
+        """Find user project ID by name, number, or ID"""
+        return self._find_project_in_list(self.get_user_projects(username), identifier)
+
+    def find_org_project_id(self, org: str, identifier: str) -> str:
+        """Find org project ID by name, number, or ID"""
+        return self._find_project_in_list(self.get_org_projects(org), identifier)
 
     def get_org_projects(self, org: str) -> List[Dict[str, Any]]:
         """Get all projects for an organization"""
@@ -74,7 +109,8 @@ class GitHubProjectsClient:
         }}
         """
         result = self.execute_query(query)
-        return result.get("data", {}).get("organization", {}).get("projectsV2", {}).get("nodes", [])
+        projects = result.get("data", {}).get("organization", {}).get("projectsV2", {}).get("nodes", [])
+        return [p for p in projects if not p.get("closed", False)]
 
     def get_project_items(self, project_id: str) -> Dict[str, Any]:
         """Get all items in a project with their field values"""
@@ -210,8 +246,8 @@ class GitHubProjectsClient:
         result = self.execute_query(query)
         issue = result.get("data", {}).get("repository", {}).get("issue", {})
         return issue.get("comments", {}).get("nodes", [])
-
-    def get_commits_by_prefix(self, owner: str, repo: str, prefix: str) -> list:
+    
+    def get_commits_by_prefix(self, owner: str, repo: str, prefix: str) -> List[Dict[str, Any]]:
         """Get commits with messages starting with given prefix"""
         query = f"""
         query {{
@@ -237,88 +273,12 @@ class GitHubProjectsClient:
         """
         result = self.execute_query(query)
         commits = result.get("data", {}).get("repository", {}).get("defaultBranchRef", {}).get("target", {}).get("history", {}).get("nodes", [])
-
+        
         # Filter commits by prefix
         filtered_commits = []
         for commit in commits:
             message = commit.get("message", "")
             if message.startswith(prefix):
                 filtered_commits.append(commit)
-
+        
         return filtered_commits
-
-    def get_all_user_data(self, username: str) -> Dict[str, Any]:
-        """Get all data for a user: projects, items, and comments"""
-        projects = self.get_user_projects(username)
-
-        result = {
-            "username": username,
-            "projects": []
-        }
-
-        for project in projects:
-            if project.get("closed"):
-                continue
-
-            project_data = self.get_project_items(project["id"])
-            project_with_items = {
-                **project,
-                **project_data
-            }
-
-            # Get comments for each issue
-            items = project_data.get("items", {}).get("nodes", [])
-            for item in items:
-                content = item.get("content", {})
-                if content and content.get("number") and content.get("url"):
-                    url = content["url"]
-                    if "/issues/" in url or "/pull/" in url:
-                        parts = url.split("/")
-                        owner, repo = parts[3], parts[4]
-                        try:
-                            comments = self.get_issue_comments(owner, repo, content["number"])
-                            item["comments"] = comments
-                        except Exception:
-                            item["comments"] = []
-
-            result["projects"].append(project_with_items)
-
-        return result
-
-    def get_all_org_data(self, org: str) -> Dict[str, Any]:
-        """Get all data for an organization: projects, items, and comments"""
-        projects = self.get_org_projects(org)
-
-        result = {
-            "organization": org,
-            "projects": []
-        }
-
-        for project in projects:
-            if project.get("closed"):
-                continue
-
-            project_data = self.get_project_items(project["id"])
-            project_with_items = {
-                **project,
-                **project_data
-            }
-
-            # Get comments for each issue
-            items = project_data.get("items", {}).get("nodes", [])
-            for item in items:
-                content = item.get("content", {})
-                if content and content.get("number") and content.get("url"):
-                    url = content["url"]
-                    if "/issues/" in url or "/pull/" in url:
-                        parts = url.split("/")
-                        owner, repo = parts[3], parts[4]
-                        try:
-                            comments = self.get_issue_comments(owner, repo, content["number"])
-                            item["comments"] = comments
-                        except Exception:
-                            item["comments"] = []
-
-            result["projects"].append(project_with_items)
-
-        return result
