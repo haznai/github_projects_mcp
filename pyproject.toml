@@ -1,0 +1,9 @@
+[project]
+name = "github-projects-mcp"
+version = "0.1.0"
+description = "MCP Server for reading and writing GitHub Projects Kanban board issues"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastmcp==2.9.0",
+]
