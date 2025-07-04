@@ -4,12 +4,32 @@ Create a MCP Server for the "GitHub Projects" Kanban board. I don't want to be a
 
 You can think of the goal as like: I need all informations I can to reconstruct a read-only barebones version of the GitHub Project UI, where moving etc. of issues doesn't work, but all the relevant info can be fetched, ad-hoc.
 
-## Current Components
-- `src/github_client.py` - Refactored GitHub GraphQL client with flexible project finding
-- `src/github_projects_mcp.py` - FastMCP server with 5 core resources
-- `src/mcp_test.py` - Basic tests (need completion for org projects)
-- `src/github_projects_cli.py` - Original CLI (now uses refactored client)
-- `serve_local_mcp_server.sh` - Server startup script
+## Architecture & Design Principles
+
+### Navigation Hierarchy
+The project follows a **user → project → issue** navigation pattern. This mirrors how users think about GitHub Projects rather than dumping all data at once.
+
+### Flexible Project Identification
+Users can reference projects in three ways:
+- **By name**: `"github_projects_mcp"` (supports partial matching)
+- **By ID**: `"PVT_kwHOApzgvs4A9BWZ"` 
+- **By number**: `"#10"` or `"10"`
+
+This flexibility is implemented in `_find_project_in_list()` and should be maintained for any new project-related features.
+
+### Cache as Implementation Detail
+The `.github_projects_cache.json` file stores the last used username/org from CLI usage. This is strictly an internal convenience - never expose cache data as MCP resources. The cache helps remember defaults but shouldn't leak into the API design.
+
+### Code Philosophy
+- **Simple over clever** - Prefer clear, readable code
+- **Explicit types** - Use typing annotations for documentation
+- **Test with real patterns** - Mock data should reflect actual GitHub API responses
+
+### Testing Strategy
+- Use FastMCP's in-memory client testing pattern
+- Mock at the client level, not the MCP server level
+- Test navigation flows, not just individual endpoints
+
 
 ## API Resources
 - `github://user/{username}` - List projects for user
